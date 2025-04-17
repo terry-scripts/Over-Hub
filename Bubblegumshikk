@@ -1,0 +1,204 @@
+local RS = game:GetService("ReplicatedStorage")
+local HS = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+
+local Plr = game:GetService("Players").LocalPlayer
+local HumRoot = Plr.Character.HumanoidRootPart
+
+_G.Settings = {}
+
+local function State(Setting)
+	return _G.Settings[Setting]
+end
+
+local Network = require(game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote)
+local DataModule = require(RS.Client.Framework.Services.LocalData)
+
+local Rayfield = loadstring(game:HttpGet('https://api.overhub.xyz/public/scripts/script/luckyUI.lua'))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "Over Hub",
+	Icon = 0,
+	LoadingTitle = "Over Hub",
+	LoadingSubtitle = "by Terry",
+	Theme = "Default",
+
+	DisableRayfieldPrompts = true,
+	DisableBuildWarnings = true,
+
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "OverHub",
+		FileName = "BGSI"
+	},
+
+	Discord = {
+		Enabled = false, 
+		Invite = "noinvitelink", 
+		RememberJoins = true 
+	},
+
+	KeySystem = false,
+	KeySettings = {
+		Title = "Untitled",
+		Subtitle = "Key System",
+		Note = "No key",
+		FileName = "Key", 
+		SaveKey = true,
+		GrabKeyFromSite = false,
+		Key = {"Hello"}
+	}
+})
+
+local Main = Window:CreateTab("Main", 4483362458)
+local Eggs = Window:CreateTab("Eggs", 4483362458)
+local Rifts = Window:CreateTab("Rifts", 4483362458)
+local Misc = Window:CreateTab("Misc", 4483362458)
+
+local BubblesToggle = Main:CreateToggle({
+	Name = "Auto Bubbles",
+	CurrentValue = false,
+	Flag = "AutoBubbles",
+	Callback = function(Value)
+		_G.Settings["AutoBubbles"] = Value
+		while _G.Settings["AutoBubbles"] do 
+			Network:FireServer("BlowBubble")
+			wait()
+		end
+	end,
+})
+
+local SellToggle = Main:CreateToggle({
+	Name = "Auto Sell",
+	CurrentValue = false,
+	Flag = "AutoSell",
+	Callback = function(Value)
+		_G.Settings["AutoSell"] = Value
+		while _G.Settings["AutoSell"] do 
+			Network:FireServer("SellBubble")
+			wait()
+		end
+	end,
+})
+
+local SellToggle2 = Main:CreateToggle({
+	Name = "Auto Sell When Full",
+	CurrentValue = false,
+	Flag = "AutoSellV2",
+	Callback = function(Value)
+		_G.Settings["AutoSellV2"] = Value
+		local Info = HS:JSONDecode(Plr:GetAttribute("Bubble"))
+		while _G.Settings["AutoSellV2"] do 
+			if require(RS.Shared.Utils.Stats.StatsUtil):GetBubbleStorage(DataModule:Get()) == DataModule:Get().Bubble.Amount then
+				Network:FireServer("SellBubble")
+			end
+			wait()
+		end
+	end,
+})
+
+local AutoCollect = Main:CreateToggle({
+	Name = "Auto Collect",
+	CurrentValue = false,
+	Flag = "AutoCollect",
+	Callback = function(Value)
+		_G.Settings["AutoCollect"] = Value
+		while _G.Settings["AutoCollect"] do 
+			for i, Folder in workspace.Rendered:GetChildren() do
+				if Folder.Name == "Chunker" then
+					for i, v in Folder:GetChildren() do
+						if not v:GetAttribute("Island") then
+							RS.Remotes.Pickups.CollectPickup:FireServer(v.Name)
+							v:Destroy()
+						end
+					end
+				end
+			end
+			wait()
+		end
+	end,
+})
+
+local EggsModule = require(RS.Shared.Data.Eggs)
+local AllEggs = {}
+local SelectedEgg
+
+for EggName, EggInfo in EggsModule do
+	print(EggName)
+	table.insert(AllEggs, EggName)
+end
+
+local EggsDropdown = Eggs:CreateDropdown({
+	Name = "Select Egg",
+	Options = AllEggs,
+	CurrentOption = "Common Egg",
+	MultipleOptions = false,
+	Flag = "EggDropdown",
+	Callback = function(Options)
+		SelectedEgg = Options[1]
+		print(SelectedEgg)
+	end,
+})
+
+local HatchToggle = Eggs:CreateToggle({
+	Name = "Auto Hatch",
+	CurrentValue = false,
+	Flag = "AutoHatch",
+	Callback = function(Value)
+		_G.Settings["AutoHatch"] = Value
+		local EggCost = EggsModule[SelectedEgg].Cost
+		while _G.Settings["AutoHatch"] do 
+			if DataModule:Get()[EggCost.Currency] >= EggCost.Amount then
+				Network:FireServer("HatchEgg", SelectedEgg, 10)
+			end
+			wait(0.25)
+		end
+	end,
+})
+
+local UnlockButton = Misc:CreateButton({
+	Name = "Unlock All Worlds",
+	Callback = function()
+		local Worlds = require(game:GetService("ReplicatedStorage").Shared.Data.Worlds)
+		local CurrentWorld = Worlds[Plr:GetAttribute("World")]
+		local LastWorld = CurrentWorld.Islands[#CurrentWorld.Islands].Name
+
+		TweenService:Create(HumRoot, TweenInfo.new(5, Enum.EasingStyle.Linear), {CFrame = workspace.Worlds:FindFirstChild(Plr:GetAttribute("World")).Islands:FindFirstChild(LastWorld).Island.UnlockHitbox.CFrame}):Play()
+	end,
+})
+
+local MasteryToggle = Misc:CreateToggle({
+	Name = "Auto Mastery",
+	CurrentValue = false,
+	Flag = "AutoMastery",
+	Callback = function(Value)
+		_G.Settings["AutoMastery"] = Value
+		while _G.Settings["AutoMastery"] do 
+			for i, UpgradeType in require(game:GetService("ReplicatedStorage").Shared.Data.Mastery).Upgrades do
+				Network:FireServer("UpgradeMastery", i)
+			end
+			wait(15)
+		end
+	end,
+})
+
+local RiftsFolder = workspace.Rendered.Rifts
+local AllRifts = {}
+
+for i, Rift in RiftsFolder:GetChildren() do
+	table.insert(AllRifts, tostring(i) .. ". " .. Rift.Name)
+end
+
+local RiftDropdown = Rifts:CreateDropdown({
+	Name = "Teleport To Rift",
+	Options = AllRifts,
+	CurrentOption = "None",
+	MultipleOptions = false,
+	Flag = "RiftDropdown",
+	Callback = function(Options)
+		local RiftNumber = tonumber(string.split(Options[1], ".")[1])
+		TweenService:Create(HumRoot, TweenInfo.new(5, Enum.EasingStyle.Linear), {CFrame = RiftsFolder:GetChildren()[RiftNumber].Display.CFrame}):Play()
+	end,
+})
+
+Rayfield:LoadConfiguration()
